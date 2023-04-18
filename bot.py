@@ -31,6 +31,8 @@ class Voice2Text(discord.Client):
         if message.author == self.user:
             return
 
+        # flag for voice message is (1 << 13)
+        # it is not yet documented in https://discord.com/developers/docs/resources/channel#message-object-message-flags
         if message.flags.value & (1 << 13):
             assert len(message.attachments) == 1
             await message.reply(await attachment_to_text(message.attachments[0]))
