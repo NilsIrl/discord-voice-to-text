@@ -11,4 +11,10 @@ to it and messages with audio attachments you select in the Apps menu.
 
 You can invite the bot using [this link][0].
 
+## Screenshots
+
+![Voice message](screenshots/voice_message.png)
+
+![Context menu](./screenshots/message_context_menu.png)
+
 [0]: https://discord.com/api/oauth2/authorize?client_id=1097877850289356870&permissions=3072&scope=bot
