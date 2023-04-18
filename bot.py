@@ -11,7 +11,7 @@ MODELS = {
         }
 
 def get_text(filename):
-    result = MODELS[DEFAULT_MODEL].transcribe(filename)
+    result = MODELS[DEFAULT_MODEL].transcribe(str(filename))
     return result["text"]
 
 class Voice2Text(discord.Client):
