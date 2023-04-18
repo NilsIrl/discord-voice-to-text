@@ -1,9 +1,10 @@
 import os
+import tempfile
 import discord
 import whisper
 from pathlib import Path
 
-ATTACHMENT_DIR = Path("attachments")
+ATTACHMENT_DIR = Path(tempfile.mkdtemp())
 
 DEFAULT_MODEL = "small"
 MODELS = {
@@ -14,23 +15,38 @@ def get_text(filename):
     result = MODELS[DEFAULT_MODEL].transcribe(str(filename))
     return result["text"]
 
+async def attachment_to_text(attachment: discord.Attachment):
+    filename = ATTACHMENT_DIR / str(attachment.id)
+    await attachment.save(filename)
+    text = get_text(filename)
+    os.remove(filename)
+    return text
+
 class Voice2Text(discord.Client):
     def __init__(self, *, intents: discord.Intents):
         super().__init__(intents=intents)
         self.tree = discord.app_commands.CommandTree(self)
 
+    async def on_message(self, message):
+        if message.author == self.user:
+            return
+
+        if message.flags.value & (1 << 13):
+            assert len(message.attachments) == 1
+            await message.reply(await attachment_to_text(message.attachments[0]))
+
     async def setup_hook(self):
         await self.tree.sync()
 
-bot = Voice2Text(intents=discord.Intents.default())
+intents = discord.Intents.default()
+intents.message_content = True
+bot = Voice2Text(intents=intents)
 
 @bot.tree.context_menu(name="Voice to text")
 async def voice_to_text(interaction: discord.Interaction, message: discord.Message):
     await interaction.response.defer(thinking=True)
     for attachment in message.attachments:
-        filename = ATTACHMENT_DIR / str(attachment.id)
-        await attachment.save(filename)
-        await interaction.followup.send(get_text(filename))
-        os.remove(filename)
+        await interaction.followup.send(await attachment_to_text(attachment))
 
 bot.run(os.environ['DISCORD_TOKEN'])
+os.removedirs(ATTACHMENT_DIR)
