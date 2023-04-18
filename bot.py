@@ -13,7 +13,7 @@ MODELS = {
 
 
 def get_text(filename):
-    result = MODELS[DEFAULT_MODEL].transcribe(str(filename))
+    result = MODELS[DEFAULT_MODEL].transcribe(str(filename), fp16=False)
     return result["text"]
 
 
