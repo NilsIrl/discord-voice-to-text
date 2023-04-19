@@ -3,9 +3,8 @@ import os
 import tempfile
 import discord
 import whisper
-from pathlib import Path
 
-ATTACHMENT_DIR = Path(tempfile.mkdtemp())
+ATTACHMENT_DIR = tempfile.mkdtemp()
 
 DEFAULT_MODEL = "small"
 MODELS = {
@@ -22,41 +21,27 @@ DEVICE = MODELS[DEFAULT_MODEL].device
 assert all(model.device == DEVICE for model in MODELS.values())
 
 
-async def attachment_to_mel(attachment):
-    filename = ATTACHMENT_DIR / str(attachment.id)
-    await attachment.save(filename)
-    audio = whisper.pad_or_trim(whisper.load_audio(str(filename)))
-    mel = whisper.log_mel_spectrogram(audio).to(DEVICE)
-    os.remove(filename)
-    return mel
-
-
-# TODO: combine mel_to_langs and attachment_to_langs
-def mel_to_langs(mel, model_name: str = None):
-    model = MODELS[model_name or DEFAULT_MODEL]
-    _, probs = model.detect_language(mel)
-    most_likely = sorted(probs, key=probs.get, reverse=True)[:25]
-    return most_likely
-
-
-# TODO: combine mel_to_text and attachment_to_text
-def mel_to_text(mel, model_name: str = None, language=None):
-    model = MODELS[model_name or DEFAULT_MODEL]
-    language = language or mel_to_langs(mel, model_name=model_name)[0]
-    result = whisper.decode(
-        model, mel, whisper.DecodingOptions(fp16=False, language=language)
-    )
-    return result.text
-
-
 async def attachment_to_text(attachment, model_name=None, language=None):
-    mel = await attachment_to_mel(attachment)
-    return mel_to_text(mel, model_name=model_name, language=language)
+    model = MODELS[model_name or DEFAULT_MODEL]
+
+    filename = os.path.join(ATTACHMENT_DIR, str(attachment.id))
+    await attachment.save(filename)
+    result = model.transcribe(filename, language=language, fp16=False)
+    os.remove(filename)
+    return result["text"]
 
 
 async def attachment_to_langs(attachment, model_name=None):
-    mel = await attachment_to_mel(attachment)
-    return mel_to_langs(mel, model_name=model_name)
+    model = MODELS[model_name or DEFAULT_MODEL]
+
+    filename = os.path.join(ATTACHMENT_DIR, str(attachment.id))
+    await attachment.save(filename)
+    audio = whisper.pad_or_trim(whisper.load_audio(filename))
+    mel = whisper.log_mel_spectrogram(audio).to(DEVICE)
+    os.remove(filename)
+    _, probs = model.detect_language(mel)
+    most_likely = sorted(probs, key=probs.get, reverse=True)[:25]
+    return most_likely
 
 
 class ModelLanguageSelect(discord.ui.Select):
