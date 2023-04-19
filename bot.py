@@ -1,3 +1,4 @@
+import asyncio
 import os
 import tempfile
 import discord
@@ -169,6 +170,11 @@ class Voice2Text(discord.Client):
             text = await attachment_to_text(message.attachments[0])
             await reply.edit(content=text)
             await reply.add_reaction("🚩")
+            await asyncio.sleep(60)
+            await asyncio.gather(
+                reply.remove_reaction("🚩", self.user),
+                reply.remove_reaction("🗑️", self.user),
+            )
         elif (
             isinstance(message.channel, discord.DMChannel)
             and len(message.attachments) > 0
@@ -199,8 +205,8 @@ class Voice2Text(discord.Client):
             await add_model_selector(message, langs)
 
     async def on_raw_reaction_remove(self, payload: discord.RawReactionActionEvent):
-        # should never fail as we don't remove reactions
-        assert payload.user_id != self.user.id
+        if payload.user_id == self.user.id:
+            return
 
         if payload.emoji.name == "🚩":
             message = await self.get_channel(payload.channel_id).fetch_message(
