@@ -11,10 +11,6 @@ MODELS = {
     model_name: whisper.load_model(model_name)
     for model_name in ["small", "medium", "large"]
 }
-MODEL_SELECT_OPTIONS = [
-    discord.SelectOption(label=label, default=label == DEFAULT_MODEL)
-    for label in MODELS
-]
 LANGUAGES = whisper.tokenizer.LANGUAGES
 
 DEVICE = MODELS[DEFAULT_MODEL].device
@@ -56,7 +52,12 @@ class ModelLanguageSelect(discord.ui.Select):
 
 class ModelSizeSelect(discord.ui.Select):
     def __init__(self):
-        super().__init__(options=MODEL_SELECT_OPTIONS)
+        super().__init__(
+            options=[
+                discord.SelectOption(label=label, default=label == DEFAULT_MODEL)
+                for label in MODELS
+            ]
+        )
 
 
 class ModelSelectorView(discord.ui.View):
