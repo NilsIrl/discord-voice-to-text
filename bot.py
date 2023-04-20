@@ -12,14 +12,13 @@ MODELS = {
     for model_name in ["small", "medium", "large"]
 }
 LANGUAGES = whisper.tokenizer.LANGUAGES
-
 DEVICE = MODELS[DEFAULT_MODEL].device
+
 assert all(model.device == DEVICE for model in MODELS.values())
 
 
 async def attachment_to_text(attachment, model_name=None, language=None):
     model = MODELS[model_name or DEFAULT_MODEL]
-
     filename = os.path.join(ATTACHMENT_DIR, str(attachment.id))
     await attachment.save(filename)
     result = model.transcribe(filename, language=language, fp16=False)
@@ -29,7 +28,6 @@ async def attachment_to_text(attachment, model_name=None, language=None):
 
 async def attachment_to_langs(attachment, model_name=None):
     model = MODELS[model_name or DEFAULT_MODEL]
-
     filename = os.path.join(ATTACHMENT_DIR, str(attachment.id))
     await attachment.save(filename)
     audio = whisper.pad_or_trim(whisper.load_audio(filename))
@@ -42,87 +40,76 @@ async def attachment_to_langs(attachment, model_name=None):
 
 class ModelLanguageSelect(discord.ui.Select):
     def __init__(self, langs):
-        super().__init__(
-            options=[
-                discord.SelectOption(label=LANGUAGES[lang], value=lang, default=i == 0)
-                for i, lang in enumerate(langs)
-            ]
-        )
+        options = [
+            discord.SelectOption(label=LANGUAGES[lang], value=lang, default=i == 0)
+            for i, lang in enumerate(langs)
+        ]
+        super().__init__(options=options)
 
 
 class ModelSizeSelect(discord.ui.Select):
     def __init__(self):
-        super().__init__(
-            options=[
-                discord.SelectOption(label=label, default=label == DEFAULT_MODEL)
-                for label in MODELS
-            ]
-        )
+        options = [
+            discord.SelectOption(label=label, default=label == DEFAULT_MODEL)
+            for label in MODELS
+        ]
+        super().__init__(options=options)
 
 
 class ModelSelectorView(discord.ui.View):
     def __init__(self, langs):
         super().__init__()
-
         self.language_selected = langs[0]
         model_language_select = ModelLanguageSelect(langs)
-
-        async def on_language_selected(interaction: discord.Interaction):
-            model_retranscribe.disabled = False
-            self.language_selected = model_language_select.values[0]
-            for select_option in model_language_select.options:
-                select_option.default = select_option.value == self.language_selected
-            await interaction.response.edit_message(view=self)
-
-        model_language_select.callback = on_language_selected
+        model_language_select.callback = self.on_language_selected
         self.add_item(model_language_select)
 
         self.model_size = DEFAULT_MODEL
         model_size_select = ModelSizeSelect()
-
-        async def on_model_size_selected(interaction: discord.Interaction):
-            model_retranscribe.disabled = False
-            self.model_size = model_size_select.values[0]
-            for select_option in model_size_select.options:
-                select_option.default = select_option.value == self.model_size
-            await interaction.response.edit_message(view=self)
-
-        model_size_select.callback = on_model_size_selected
+        model_size_select.callback = self.on_model_size_selected
         self.add_item(model_size_select)
 
         model_retranscribe = discord.ui.Button(
             label="Retranscribe", style=discord.ButtonStyle.primary
         )
+        model_retranscribe.callback = self.on_retranscribe
         model_retranscribe.disabled = True
-
-        async def on_retranscribe(interaction: discord.Interaction):
-            model_retranscribe.disabled = True
-            model_language_select.disabled = True
-            model_size_select.disabled = True
-
-            await interaction.response.edit_message(view=self)
-            # message isn't resolved here, so we have to fetch it
-            audio_message = (
-                interaction.message.reference.cached_message
-                or await bot.get_channel(
-                    interaction.message.reference.channel_id
-                ).fetch_message(interaction.message.reference.message_id)
-            )
-            assert len(audio_message.attachments) == 1
-            model_language_select.disabled = False
-            model_size_select.disabled = False
-            await interaction.followup.edit_message(
-                interaction.message.id,
-                content=await attachment_to_text(
-                    audio_message.attachments[0],
-                    model_name=self.model_size,
-                    language=self.language_selected,
-                ),
-                view=self,
-            )
-
-        model_retranscribe.callback = on_retranscribe
         self.add_item(model_retranscribe)
+
+    async def on_language_selected(self, interaction: discord.Interaction):
+        self.language_selected = self.children[0].values[0]
+        self.children[2].disabled = False
+        await interaction.response.edit_message(view=self)
+
+    async def on_model_size_selected(self, interaction: discord.Interaction):
+        self.model_size = self.children[1].values[0]
+        self.children[2].disabled = False
+        await interaction.response.edit_message(view=self)
+
+    async def on_retranscribe(self, interaction: discord.Interaction):
+        self.children[0].disabled = True
+        self.children[1].disabled = True
+        self.children[2].disabled = True
+        await interaction.response.edit_message(view=self)
+
+        audio_message = (
+            interaction.message.reference.cached_message
+            or await bot.get_channel(
+                interaction.message.reference.channel_id
+            ).fetch_message(interaction.message.reference.message_id)
+        )
+        assert len(audio_message.attachments) == 1
+        self.children[0].disabled = False
+        self.children[1].disabled = False
+        await interaction.followup.edit_message(
+            interaction.message.id,
+            content=await attachment_to_text(
+                audio_message.attachments[0],
+                model_name=self.model_size,
+                language=self.language_selected,
+            ),
+            view=self,
+        )
 
 
 async def add_model_selector(message: discord.Message, langs):
@@ -173,7 +160,6 @@ class Voice2Text(discord.Client):
         if payload.user_id == self.user.id:
             return
 
-        # TODO: this could be avoided when the emoji isn't one of those we handle
         message = await self.get_channel(payload.channel_id).fetch_message(
             payload.message_id
         )
