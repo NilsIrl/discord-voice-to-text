@@ -100,6 +100,7 @@ class ModelSelectorView(discord.ui.View):
             model_language_select.disabled = True
             model_size_select.disabled = True
 
+            await interaction.message.add_reaction("⏳")
             await interaction.response.edit_message(view=self)
             # message isn't resolved here, so we have to fetch it
             audio_message = (
@@ -120,6 +121,7 @@ class ModelSelectorView(discord.ui.View):
                 ),
                 view=self,
             )
+            await interaction.message.remove_reaction("⏳", bot.user)
 
         model_retranscribe.callback = on_retranscribe
         self.add_item(model_retranscribe)
@@ -153,9 +155,11 @@ class Voice2Text(discord.Client):
         if message.flags.value & (1 << 13):
             reply = await message.reply("_transcribing audio_")
             await reply.add_reaction("🗑️")
+            await reply.add_reaction("⏳")
             assert len(message.attachments) == 1
             text = await attachment_to_text(message.attachments[0])
             await reply.edit(content=text)
+            await reply.remove_reaction("⏳", self.user)
             await reply.add_reaction("🚩")
             await asyncio.sleep(60)
             await asyncio.gather(
