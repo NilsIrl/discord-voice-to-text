@@ -148,7 +148,8 @@ class Voice2Text(discord.Client):
             return
 
         # flag for voice message is (1 << 13)
-        # it is not yet documented in https://discord.com/developers/docs/resources/channel#message-object-message-flags
+        # it is not yet documented in
+        # https://discord.com/developers/docs/resources/channel#message-object-message-flags
         if message.flags.value & (1 << 13):
             reply = await message.reply("_transcribing audio_")
             await reply.add_reaction("🗑️")
@@ -184,7 +185,8 @@ class Voice2Text(discord.Client):
         if payload.emoji.name == "🗑️":
             await message.delete()
         elif payload.emoji.name == "🚩":
-            # TODO: this seems to get resolved but I'm not sure of the conditions under which a message gets resolved or not
+            # TODO: this seems to get resolved but I'm not sure of the
+            # conditions under which a message gets resolved or not
             voice_message = message.reference.resolved
             assert len(voice_message.attachments) == 1
             langs = await attachment_to_langs(voice_message.attachments[0])
